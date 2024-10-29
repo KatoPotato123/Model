@@ -1,33 +1,20 @@
-#pip install langchain-groq
-
 import streamlit as st
+import openai
 import pandas as pd
-import numpy as np
-from langchain_groq import ChatGroq
 
-document_id = "1gVtZ1Cvu8vvvwMzakWjopIL17xNc32F01Wx4O65gKAQ"
-tab_name = "MAIN%20FOR%20FIVERR%20GUY"
+# Set up OpenAI API key securely from Streamlit secrets
+openai.api_key = st.secrets["general"]["openai_api_key"]
 
-# Use the correct URL format for exporting to CSV
+# Google Sheets document details
+document_id = st.secrets["documents"]["document_id"]
+tab_name = st.secrets["tab_name"]["tab_name_id"]
 full_url = f"https://docs.google.com/spreadsheets/d/{document_id}/gviz/tq?tqx=out:csv&sheet={tab_name}"
 
-# df = pd.read_csv(full_url)
-
-
-ncaaf_df=pd.read_csv(full_url)
-# ncaaf_df.dropna(inplace=True)
+# Load data from Google Sheets
+ncaaf_df = pd.read_csv(full_url)
 ncaaf_df.rename(columns={"Sheet Name :- ": "Team"}, inplace=True)
 
-GROQ_API_KEY="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"
-
-
-llm = ChatGroq(
-    temperature=0,
-    model="llama-3.1-70b-versatile",
-    api_key=GROQ_API_KEY
-)
-
-def get_prompt(team1,team2):
+def get_prompt(team1, team2):
   team1_stats=ncaaf_df[ncaaf_df["Team"]==team1].to_markdown()
   team2_stats=ncaaf_df[ncaaf_df["Team"]==team2].to_markdown()
   
@@ -43,20 +30,24 @@ def get_prompt(team1,team2):
   """
   return prompt
 
+def predict_winner(prompt):
+    # Use the compatible OpenAI API method
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",  # or "gpt-4" if available
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response['choices'][0]['message']['content']
 
-
-
-teams=ncaaf_df["Team"].values.tolist()
+teams = ncaaf_df["Team"].unique().tolist()
 
 st.title("AI Win Predictor")
 
-
-team1=st.selectbox("Team-1", teams)
-team2=st.selectbox("Team-2", teams,index=1)
+team1 = st.selectbox("Select Team 1", teams)
+team2 = st.selectbox("Select Team 2", teams, index=1)
 
 if st.button("Predict"):
-	res=llm.invoke(get_prompt(team1,team2))
-	st.balloons()
-	st.header("Winner is")
-	st.write(res.content)
-
+    prompt = get_prompt(team1, team2)
+    result = predict_winner(prompt)
+    st.balloons()
+    st.header("Predicted Winner")
+    st.write(result)
